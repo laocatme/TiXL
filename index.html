@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>TiXL 中文社区 — 开源实时动态图形</title>
+<meta name="description" content="TiXL 中文爱好者社区，探索开源实时动态图形、VJ演出、装置艺术的无限可能"/>
+<!-- Vue 3 via jsDelivr（国内可访问） -->
+<script src="https://cdn.jsdelivr.net/npm/vue@3.4.21/dist/vue.global.prod.js"></script>
+<style>
+:root{
+  --bg:#030712;--bg2:#0a0f1e;--bgc:#0d1526;
+  --cy:#00e5ff;--mg:#ff006e;--ye:#ffd600;--gr:#00ff9d;
+  --t1:#e8f4fd;--t2:#7a9bb8;--td:#3d5a73;
+  --bs:rgba(0,229,255,.12);
+  --gc:rgba(0,229,255,.04);
+  --fd:'Orbitron',system-ui,sans-serif;
+  --fb:-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;
+  --fm:'Courier New',monospace;
+}
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--t1);font-family:var(--fb);overflow-x:hidden;line-height:1.6}
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--cy);border-radius:2px}
+body::before{
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background-image:linear-gradient(var(--gc) 1px,transparent 1px),linear-gradient(90deg,var(--gc) 1px,transparent 1px);
+  background-size:60px 60px;
+}
+canvas{position:fixed;inset:0;z-index:0;pointer-events:none}
+#app{position:relative;z-index:1}
+
+/* NAV */
+.nav{position:fixed;top:0;left:0;right:0;z-index:100;height:64px;display:flex;align-items:center;justify-content:space-between;padding:0 2rem;background:rgba(3,7,18,.9);backdrop-filter:blur(16px);border-bottom:1px solid var(--bs);transition:.3s}
+.nav.scrolled{height:54px;background:rgba(3,7,18,.97)}
+.logo{display:flex;align-items:center;gap:.6rem;cursor:pointer}
+.logo-hex{width:34px;height:34px;flex-shrink:0;background:linear-gradient(135deg,var(--cy),var(--mg));clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);display:flex;align-items:center;justify-content:center;font-family:var(--fd);font-size:11px;font-weight:900;color:#030712;animation:pulse 3s ease-in-out infinite}
+@keyframes pulse{0%,100%{filter:drop-shadow(0 0 5px var(--cy))}50%{filter:drop-shadow(0 0 10px var(--mg))}}
+.logo-text{font-family:var(--fd);font-size:.95rem;font-weight:700;letter-spacing:.04em;background:linear-gradient(90deg,var(--cy),var(--mg));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.nav-links{display:flex;gap:.2rem;list-style:none;align-items:center}
+.nav-btn{padding:.4rem .8rem;font-size:.84rem;color:var(--t2);cursor:pointer;border-radius:4px;transition:.2s;border:none;background:none;font-family:var(--fb);position:relative}
+.nav-btn:hover,.nav-btn.act{color:var(--cy);background:rgba(0,229,255,.07)}
+.nav-btn.act::after{content:'';position:absolute;bottom:2px;left:50%;transform:translateX(-50%);width:14px;height:2px;background:var(--cy);border-radius:1px}
+.nav-dl{padding:.4rem 1rem;background:linear-gradient(90deg,var(--cy),#0099bb);color:#030712!important;border-radius:4px;font-weight:700;font-size:.82rem;text-decoration:none;transition:.2s;letter-spacing:.04em}
+.nav-dl:hover{filter:brightness(1.12);transform:translateY(-1px);box-shadow:0 4px 16px rgba(0,229,255,.35)}
+.burger{display:none;flex-direction:column;gap:5px;cursor:pointer;padding:4px}
+.burger span{width:22px;height:2px;background:var(--cy);border-radius:1px;display:block}
+
+/* ANNOUNCE */
+.ann{background:linear-gradient(90deg,rgba(0,229,255,.07),rgba(255,0,110,.05));border-bottom:1px solid var(--bs);padding:.45rem 2rem;text-align:center;font-size:.78rem;color:var(--t2)}
+.ann a{color:var(--cy);text-decoration:none}
+.ann-tag{display:inline-block;background:rgba(0,255,157,.14);color:var(--gr);border-radius:3px;padding:0 .4rem;font-family:var(--fm);font-size:.64rem;margin-right:.4rem;letter-spacing:.08em}
+
+/* HERO */
+.hero{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8rem 2rem 4rem;position:relative}
+.hero-badge{display:inline-flex;align-items:center;gap:.5rem;padding:.28rem .85rem;border:1px solid var(--cy);border-radius:100px;font-family:var(--fm);font-size:.68rem;color:var(--cy);letter-spacing:.1em;text-transform:uppercase;margin-bottom:1.75rem;background:rgba(0,229,255,.06);animation:fup .8s ease both}
+.badge-dot{width:6px;height:6px;background:var(--cy);border-radius:50%;animation:blink 1.5s ease infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+.hero-title{font-family:var(--fd);font-size:clamp(2.8rem,10vw,7rem);font-weight:900;line-height:.9;letter-spacing:-.02em;margin-bottom:1.4rem;animation:fup .9s .1s ease both}
+.ht-main{display:block;background:linear-gradient(135deg,#fff 0%,var(--cy) 40%,var(--mg) 80%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(0 0 40px rgba(0,229,255,.28))}
+.ht-sub{display:block;font-family:var(--fb);font-size:.28em;font-weight:400;color:var(--t2);letter-spacing:.2em;text-transform:uppercase;-webkit-text-fill-color:var(--t2);margin-top:.6rem}
+.hero-desc{max-width:600px;font-size:1.05rem;color:var(--t2);line-height:1.8;margin-bottom:2.25rem;animation:fup .9s .2s ease both}
+.hero-desc strong{color:var(--cy);font-weight:500}
+.hero-btns{display:flex;gap:.85rem;flex-wrap:wrap;justify-content:center;margin-bottom:3.5rem;animation:fup .9s .3s ease both}
+.btn-p{padding:.8rem 1.8rem;background:linear-gradient(135deg,var(--cy),#0077aa);color:#030712;border:none;border-radius:4px;font-family:var(--fd);font-size:.82rem;font-weight:700;letter-spacing:.05em;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:.5rem;transition:.25s;box-shadow:0 0 24px rgba(0,229,255,.22)}
+.btn-p:hover{transform:translateY(-2px);box-shadow:0 6px 28px rgba(0,229,255,.42);filter:brightness(1.1)}
+.btn-s{padding:.8rem 1.8rem;background:transparent;color:var(--t1);border:1px solid var(--bs);border-radius:4px;font-family:var(--fd);font-size:.82rem;font-weight:700;letter-spacing:.05em;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:.5rem;transition:.25s}
+.btn-s:hover{border-color:var(--cy);color:var(--cy);background:rgba(0,229,255,.05);transform:translateY(-2px)}
+.hero-stats{display:flex;gap:3rem;flex-wrap:wrap;justify-content:center;animation:fup .9s .4s ease both}
+.stat-num{font-family:var(--fd);font-size:1.9rem;font-weight:900;color:var(--cy);display:block;line-height:1}
+.stat-lab{font-size:.72rem;color:var(--td);letter-spacing:.1em;text-transform:uppercase;margin-top:.25rem}
+.scroll-hint{position:absolute;bottom:2rem;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:.35rem;font-size:.65rem;color:var(--td);letter-spacing:.1em;animation:bounce 2s ease infinite}
+.scroll-line{width:1px;height:36px;background:linear-gradient(to bottom,var(--cy),transparent)}
+@keyframes bounce{0%,100%{transform:translateX(-50%) translateY(0)}50%{transform:translateX(-50%) translateY(6px)}}
+@keyframes fup{from{opacity:0;transform:translateY(28px)}to{opacity:1;transform:translateY(0)}}
+
+/* SECTIONS */
+.sec{padding:5.5rem 2rem;max-width:1200px;margin:0 auto}
+.sec-label{font-family:var(--fm);font-size:.7rem;color:var(--cy);letter-spacing:.18em;text-transform:uppercase;margin-bottom:.65rem;display:flex;align-items:center;gap:.65rem}
+.sec-label::before{content:'';width:22px;height:1px;background:var(--cy)}
+.sec-title{font-family:var(--fd);font-size:clamp(1.7rem,4vw,2.6rem);font-weight:700;line-height:1.1;margin-bottom:.9rem;color:var(--t1)}
+.sec-title span{background:linear-gradient(90deg,var(--cy),var(--mg));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.sec-desc{max-width:540px;color:var(--t2);font-size:.97rem;line-height:1.8;margin-bottom:2.75rem}
+.divider{width:100%;height:1px;background:linear-gradient(90deg,transparent,var(--cy),var(--mg),transparent);opacity:.25}
+.pg{display:none}.pg.on{display:block}
+
+/* INTRO */
+.intro-grid{display:grid;grid-template-columns:1fr 1fr;gap:3.5rem;align-items:center}
+.feat-list{list-style:none;display:flex;flex-direction:column;gap:1.1rem}
+.feat-li{display:flex;gap:.9rem;align-items:flex-start}
+.feat-icon{width:40px;height:40px;flex-shrink:0;border-radius:8px;background:rgba(0,229,255,.07);border:1px solid var(--bs);display:flex;align-items:center;justify-content:center;font-size:1.05rem}
+.feat-li h4{font-size:.93rem;font-weight:600;color:var(--t1);margin-bottom:.18rem}
+.feat-li p{font-size:.83rem;color:var(--t2);line-height:1.6}
+
+/* SCREEN */
+.screen{width:100%;aspect-ratio:16/10;background:var(--bg2);border-radius:8px;border:1px solid var(--bs);overflow:hidden}
+.screen-bar{height:26px;background:rgba(0,229,255,.04);border-bottom:1px solid var(--bs);display:flex;align-items:center;padding:0 10px;gap:5px}
+.dot{width:7px;height:7px;border-radius:50%}
+.screen-body{padding:12px;display:grid;grid-template-columns:1fr 1fr;gap:7px;height:calc(100% - 26px)}
+.fnode{background:rgba(0,229,255,.05);border:1px solid var(--bs);border-radius:4px;padding:7px;font-family:var(--fm);font-size:.56rem;color:var(--td);position:relative;overflow:hidden}
+.fnode::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--cy),transparent);animation:scan 2.2s linear infinite}
+@keyframes scan{0%,100%{opacity:1}50%{opacity:.25}}
+.fn-t{color:var(--cy);margin-bottom:3px;font-size:.58rem}
+.fbar{height:3px;background:rgba(255,255,255,.08);border-radius:2px;margin:3px 0;overflow:hidden}
+.fbar-f{height:100%;background:linear-gradient(90deg,var(--cy),var(--mg));border-radius:2px;animation:fill 3s ease infinite}
+@keyframes fill{0%{width:20%}50%{width:80%}100%{width:45%}}
+
+/* FEATURES GRID */
+.fg{display:grid;grid-template-columns:repeat(3,1fr);gap:1.5px;background:var(--bs);border:1.5px solid var(--bs);border-radius:8px;overflow:hidden}
+.fc{background:var(--bgc);padding:1.85rem;transition:background .3s;cursor:default}
+.fc:hover{background:rgba(13,21,38,.95)}
+.fc:hover .fi{transform:scale(1.1) rotate(-5deg)}
+.fi{font-size:1.9rem;margin-bottom:.9rem;display:block;transition:transform .3s}
+.ftag{font-family:var(--fm);font-size:.63rem;letter-spacing:.1em;text-transform:uppercase;color:var(--cy);margin-bottom:.35rem}
+.fc h3{font-size:1rem;font-weight:600;margin-bottom:.45rem;color:var(--t1)}
+.fc p{font-size:.83rem;color:var(--t2);line-height:1.7}
+
+/* STEPS */
+.steps-wrap{display:grid;grid-template-columns:1fr 1fr;gap:2rem;align-items:start}
+.step-list{display:flex;flex-direction:column}
+.step-it{display:flex;gap:1.1rem;padding:1.4rem;border-radius:8px;cursor:pointer;transition:background .2s}
+.step-it.on{background:rgba(0,229,255,.06)}
+.step-it:hover:not(.on){background:rgba(0,229,255,.03)}
+.step-n{width:34px;height:34px;flex-shrink:0;border-radius:50%;border:2px solid var(--td);display:flex;align-items:center;justify-content:center;font-family:var(--fd);font-size:.76rem;font-weight:700;color:var(--td);transition:.2s}
+.step-it.on .step-n{border-color:var(--cy);color:var(--cy);background:rgba(0,229,255,.1);box-shadow:0 0 10px rgba(0,229,255,.22)}
+.step-ct h4{font-size:.92rem;font-weight:600;margin-bottom:.25rem;color:var(--t2);transition:.2s}
+.step-it.on .step-ct h4{color:var(--t1)}
+.step-ct p{font-size:.8rem;color:var(--td);line-height:1.6}
+.code-panel{background:var(--bgc);border:1px solid var(--bs);border-radius:8px;overflow:hidden;position:sticky;top:80px}
+.cp-head{padding:.7rem 1.1rem;background:rgba(0,229,255,.04);border-bottom:1px solid var(--bs);font-family:var(--fm);font-size:.72rem;color:var(--cy);display:flex;align-items:center;gap:.45rem}
+.cp-body{padding:1.4rem}
+.cp-body pre{font-family:var(--fm);font-size:.8rem;line-height:1.75;color:var(--t2);white-space:pre-wrap;word-break:break-word}
+.kw{color:var(--cy)}.str{color:var(--gr)}.cm{color:var(--td)}.num{color:var(--ye)}
+.note{margin-top:.9rem;padding:.7rem .9rem;background:rgba(255,214,0,.05);border-left:3px solid var(--ye);border-radius:0 4px 4px 0;font-size:.79rem;color:var(--t2)}
+
+/* TUTORIALS */
+.tgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1.4rem}
+.tc{background:var(--bgc);border:1px solid var(--bs);border-radius:8px;overflow:hidden;cursor:pointer;transition:all .3s}
+.tc:hover{border-color:rgba(0,229,255,.35);transform:translateY(-4px);box-shadow:0 12px 40px rgba(0,0,0,.5)}
+.tc:hover .tplay{background:var(--cy);box-shadow:0 0 24px rgba(0,229,255,.45)}
+.tthumb{aspect-ratio:16/9;position:relative;display:flex;align-items:center;justify-content:center;font-size:2.6rem}
+.tthumb::after{content:'';position:absolute;inset:0;background:linear-gradient(135deg,transparent,rgba(0,0,0,.5))}
+.tplay{position:absolute;width:46px;height:46px;background:rgba(0,229,255,.18);border:2px solid var(--cy);border-radius:50%;display:flex;align-items:center;justify-content:center;z-index:1;transition:.2s}
+.tplay svg{fill:white;margin-left:3px}
+.tlev{position:absolute;top:9px;right:9px;z-index:1;font-family:var(--fm);font-size:.62rem;letter-spacing:.09em;padding:.18rem .48rem;border-radius:3px;text-transform:uppercase}
+.lv-b{background:rgba(0,255,157,.18);color:var(--gr);border:1px solid rgba(0,255,157,.28)}
+.lv-i{background:rgba(255,214,0,.18);color:var(--ye);border:1px solid rgba(255,214,0,.28)}
+.lv-a{background:rgba(255,0,110,.18);color:var(--mg);border:1px solid rgba(255,0,110,.28)}
+.tbody{padding:1.1rem}
+.tbody h3{font-size:.92rem;font-weight:600;margin-bottom:.35rem;color:var(--t1)}
+.tbody p{font-size:.8rem;color:var(--t2);line-height:1.6;margin-bottom:.65rem}
+.tmeta{display:flex;gap:.9rem;font-family:var(--fm);font-size:.68rem;color:var(--td)}
+
+/* TABS */
+.tabs{display:flex;gap:.4rem;margin-bottom:2rem;flex-wrap:wrap}
+.tab{padding:.45rem 1.1rem;border-radius:4px;font-size:.83rem;cursor:pointer;border:1px solid transparent;background:transparent;color:var(--td);font-family:var(--fb);transition:.2s}
+.tab.on{background:rgba(0,229,255,.1);border-color:rgba(0,229,255,.38);color:var(--cy)}
+.tab:hover:not(.on){color:var(--t2);background:rgba(255,255,255,.03)}
+
+/* RESOURCES */
+.rgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:1.4rem}
+.rc{background:var(--bgc);border:1px solid var(--bs);border-radius:8px;padding:1.6rem;text-decoration:none;display:flex;gap:1.1rem;align-items:flex-start;transition:all .25s}
+.rc:hover{border-color:rgba(0,229,255,.3);transform:translateY(-2px)}
+.rc:hover .rlink svg{transform:translateX(4px)}
+.ri{width:46px;height:46px;flex-shrink:0;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.35rem}
+.rc h3{font-size:.97rem;font-weight:600;margin-bottom:.28rem;color:var(--t1)}
+.rc p{font-size:.81rem;color:var(--t2);line-height:1.6}
+.rlink{margin-top:.65rem;font-size:.73rem;font-family:var(--fm);color:var(--cy);display:flex;align-items:center;gap:.28rem}
+.rlink svg{transition:transform .2s}
+
+/* FAQ */
+.faq-list{display:flex;flex-direction:column;gap:.65rem}
+.faq-it{background:var(--bgc);border:1px solid var(--bs);border-radius:6px;overflow:hidden;cursor:pointer;transition:border-color .2s}
+.faq-it.on{border-color:rgba(0,229,255,.28)}
+.faq-q{padding:1rem 1.2rem;display:flex;align-items:center;justify-content:space-between;gap:.9rem}
+.faq-q h4{font-size:.92rem;font-weight:500;color:var(--t1)}
+.faq-chev{width:20px;height:20px;flex-shrink:0;border:1px solid var(--bs);border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--td);font-size:.75rem;transition:all .3s}
+.faq-it.on .faq-chev{background:rgba(0,229,255,.1);border-color:var(--cy);color:var(--cy);transform:rotate(180deg)}
+.faq-a{padding:0 1.2rem;max-height:0;overflow:hidden;transition:all .35s ease}
+.faq-it.on .faq-a{max-height:250px;padding-bottom:1.1rem}
+.faq-a p{font-size:.86rem;color:var(--t2);line-height:1.8}
+.faq-a a{color:var(--cy);text-decoration:none}
+
+/* COMMUNITY */
+.comm-box{background:linear-gradient(135deg,rgba(0,229,255,.04),rgba(255,0,110,.03));border:1px solid var(--bs);border-radius:12px;padding:2.75rem;text-align:center;position:relative;overflow:hidden}
+.comm-box::before{content:'';position:absolute;top:-60px;right:-60px;width:180px;height:180px;background:radial-gradient(circle,rgba(0,229,255,.08) 0%,transparent 70%);border-radius:50%}
+.comm-box::after{content:'';position:absolute;bottom:-60px;left:-60px;width:180px;height:180px;background:radial-gradient(circle,rgba(255,0,110,.06) 0%,transparent 70%);border-radius:50%}
+.comm-links{display:flex;gap:1.25rem;justify-content:center;flex-wrap:wrap;margin-top:1.75rem;position:relative;z-index:1}
+.clink{display:flex;align-items:center;gap:.65rem;padding:.9rem 1.75rem;background:rgba(255,255,255,.03);border:1px solid var(--bs);border-radius:8px;text-decoration:none;color:var(--t1);font-size:.88rem;font-weight:500;transition:all .25s;min-width:170px;justify-content:center}
+.clink:hover{background:rgba(255,255,255,.06);border-color:rgba(0,229,255,.3);transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.4)}
+.clink-col{flex-direction:column;padding:1.4rem 1.75rem;gap:.4rem;min-width:148px}
+.ci{font-size:1.9rem}
+.clink-col .cn{font-weight:600}
+.clink-col .cs{font-size:.72rem;color:var(--td)}
+
+/* LEARNING PATH */
+.lpath{display:flex;flex-direction:column;margin-top:1.5rem;position:relative}
+.lpath::before{content:'';position:absolute;left:23px;top:0;bottom:0;width:1px;background:linear-gradient(to bottom,var(--cy),rgba(0,229,255,.1))}
+.lp-it{display:flex;gap:1.4rem;align-items:flex-start;margin-bottom:1.9rem;position:relative}
+.lp-num{width:48px;height:48px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-family:var(--fd);font-size:.78rem;font-weight:700;color:#030712;z-index:1}
+.lp-ct{padding-top:.5rem}
+.lp-ct h4{font-size:.97rem;font-weight:600;margin-bottom:.28rem;color:var(--t1)}
+.lp-ct p{font-size:.83rem;color:var(--t2);line-height:1.6;margin-bottom:.45rem}
+.tags{display:flex;flex-wrap:wrap;gap:.35rem}
+.tag{font-size:.68rem;font-family:var(--fm);padding:.18rem .48rem;border-radius:3px;background:rgba(0,229,255,.06);border:1px solid var(--bs);color:var(--td)}
+
+/* SHORTCUTS */
+.sc-grid{display:grid;grid-template-columns:1fr 1fr;gap:.9rem;margin-top:1rem}
+.sc-box{background:var(--bgc);border:1px solid var(--bs);border-radius:8px;overflow:hidden}
+.sc-head{padding:.7rem 1.1rem;border-bottom:1px solid var(--bs);font-family:var(--fd);font-size:.7rem;letter-spacing:.1em;color:var(--cy)}
+.sc-row{display:flex;align-items:center;justify-content:space-between;padding:.45rem 1.1rem}
+.sc-desc{font-size:.83rem;color:var(--t2)}
+.sc-keys{display:flex;gap:.22rem}
+kbd{padding:.18rem .45rem;background:rgba(0,0,0,.4);border:1px solid var(--bs);border-radius:4px;font-family:var(--fm);font-size:.7rem;color:var(--t2)}
+
+/* GUIDELINES */
+.guide-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1.4rem;margin-top:1.4rem}
+.guide-it{background:var(--bgc);border:1px solid var(--bs);border-radius:8px;padding:1.4rem}
+.gi{font-size:1.75rem;margin-bottom:.65rem}
+.guide-it h4{font-size:.92rem;font-weight:600;margin-bottom:.35rem;color:var(--t1)}
+.guide-it p{font-size:.81rem;color:var(--t2);line-height:1.7}
+
+/* SYS REQS */
+.req-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.4rem;margin-top:.5rem}
+.req-box{background:var(--bgc);border-radius:8px;padding:1.65rem}
+.req-row{display:flex;gap:.7rem;align-items:center;margin-bottom:.65rem}
+.req-lbl{font-size:.78rem;color:var(--td);min-width:72px;font-family:var(--fm)}
+
+/* FOOTER */
+footer{border-top:1px solid var(--bs);padding:2.75rem 2rem 2rem;max-width:1200px;margin:0 auto}
+.foot-grid{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:2.75rem;margin-bottom:2.25rem}
+.foot-brand p{font-size:.83rem;color:var(--td);line-height:1.7;margin-top:.7rem;max-width:250px}
+.foot-col h5{font-family:var(--fd);font-size:.72rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--t2);margin-bottom:.9rem}
+.foot-col ul{list-style:none;display:flex;flex-direction:column;gap:.45rem}
+.foot-col a{font-size:.83rem;color:var(--td);text-decoration:none;cursor:pointer;transition:color .2s}
+.foot-col a:hover{color:var(--cy)}
+.foot-btm{display:flex;align-items:center;justify-content:space-between;padding-top:1.4rem;border-top:1px solid var(--bs);font-size:.76rem;color:var(--td)}
+.foot-btm a{color:var(--cy);text-decoration:none}
+
+/* TOAST */
+.toast{position:fixed;bottom:1.75rem;right:1.75rem;z-index:999;background:var(--bgc);border:1px solid var(--cy);border-radius:6px;padding:.7rem 1.15rem;font-size:.84rem;color:var(--cy);box-shadow:0 8px 32px rgba(0,0,0,.5);animation:tin .3s ease}
+@keyframes tin{from{transform:translateY(18px);opacity:0}to{transform:translateY(0);opacity:1}}
+
+/* RESPONSIVE */
+@media(max-width:768px){
+  .nav-links{display:none}
+  .nav-links.mob{display:flex;flex-direction:column;position:absolute;top:64px;left:0;right:0;background:var(--bg);border-bottom:1px solid var(--bs);padding:.9rem;gap:.35rem}
+  .burger{display:flex}
+  .intro-grid,.steps-wrap,.req-grid,.rgrid,.foot-grid,.sc-grid{grid-template-columns:1fr}
+  .fg{grid-template-columns:1fr 1fr}
+  .foot-grid{grid-template-columns:1fr 1fr}
+  .guide-grid{grid-template-columns:1fr 1fr}
+}
+@media(max-width:480px){
+  .fg,.foot-grid,.guide-grid{grid-template-columns:1fr}
+  .hero-stats{gap:1.4rem}
+  .comm-links{flex-direction:column;align-items:center}
+}
+</style>
+</head>
+<body>
+<canvas id="cvs"></canvas>
+<div id="app">
+
+<!-- 公告栏 -->
+<div class="ann">
+  <span class="ann-tag">NEW</span>
+  TiXL v4.0 正式发布！全新渲染引擎，更强大的节点系统 ·
+  <a href="https://github.com/tixl3d/tixl/releases" target="_blank">立即下载 →</a>
+</div>
+
+<!-- 导航 -->
+<nav class="nav" :class="{scrolled:isScrolled}">
+  <div class="logo" @click="go('home')">
+    <div class="logo-hex">TX</div>
+    <span class="logo-text">TiXL 中文社区</span>
+  </div>
+  <ul class="nav-links" :class="{mob:menuOpen}">
+    <li><button class="nav-btn" :class="{act:page==='home'}"  @click="go('home')">首页</button></li>
+    <li><button class="nav-btn" :class="{act:page==='start'}" @click="go('start')">快速开始</button></li>
+    <li><button class="nav-btn" :class="{act:page==='learn'}" @click="go('learn')">教程学习</button></li>
+    <li><button class="nav-btn" :class="{act:page==='res'}"   @click="go('res')">资源中心</button></li>
+    <li><button class="nav-btn" :class="{act:page==='comm'}"  @click="go('comm')">社区</button></li>
+    <li><a class="nav-btn nav-dl" href="https://github.com/tixl3d/tixl/releases" target="_blank">⬇ 下载</a></li>
+  </ul>
+  <div class="burger" @click="menuOpen=!menuOpen"><span></span><span></span><span></span></div>
+</nav>
+
+<!-- ══ 首页 ══ -->
+<div class="pg" :class="{on:page==='home'}">
+  <div class="hero">
+    <div class="hero-badge"><span class="badge-dot"></span>开源 · 免费 · 实时渲染</div>
+    <h1 class="hero-title">
+      <span class="ht-main">TiXL</span>
+      <span class="ht-sub">中文爱好者社区</span>
+    </h1>
+    <p class="hero-desc">一款强大的<strong>开源实时动态图形软件</strong>，专为装置艺术、现场演出和VJ创作而生。<br/>节点式创作流程，音频反应，无需编程基础即可上手。</p>
+    <div class="hero-btns">
+      <button class="btn-p" @click="go('start')">▶ 快速开始</button>
+      <a class="btn-s" href="https://github.com/tixl3d/tixl" target="_blank">★ GitHub 仓库</a>
+      <a class="btn-s" href="https://tixl.app" target="_blank">🌐 官方网站</a>
+    </div>
+    <div class="hero-stats">
+      <div><span class="stat-num">v4.0</span><div class="stat-lab">最新版本</div></div>
+      <div><span class="stat-num">免费</span><div class="stat-lab">永久开源</div></div>
+      <div><span class="stat-num">实时</span><div class="stat-lab">高性能渲染</div></div>
+      <div><span class="stat-num">节点</span><div class="stat-lab">可视化编程</div></div>
+    </div>
+    <div class="scroll-hint"><div class="scroll-line"></div>SCROLL</div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- 关于 -->
+  <section class="sec">
+    <div class="intro-grid">
+      <div>
+        <div class="sec-label">关于 TiXL</div>
+        <h2 class="sec-title">实时动态图形的<span>全新可能</span></h2>
+        <p class="sec-desc">TiXL（前身为 Tooll3/Tooll4）是专为艺术家、VJ和装置设计师打造的开源平台，将快速渲染、程序化创意和关键帧控制融于一体。</p>
+        <ul class="feat-list">
+          <li class="feat-li" v-for="f in introFeats" :key="f.t">
+            <div class="feat-icon">{{f.icon}}</div>
+            <div><h4>{{f.t}}</h4><p>{{f.d}}</p></div>
+          </li>
+        </ul>
+      </div>
+      <div>
+        <div class="screen">
+          <div class="screen-bar">
+            <div class="dot" style="background:#ff5f56"></div>
+            <div class="dot" style="background:#ffbd2e"></div>
+            <div class="dot" style="background:#27c93f"></div>
+            <span style="font-family:var(--fm);font-size:.55rem;color:var(--td);margin-left:8px">TiXL — Node Editor</span>
+          </div>
+          <div class="screen-body">
+            <div class="fnode"><div class="fn-t">Audio Reaction</div><div class="fbar"><div class="fbar-f" style="animation-duration:1.2s"></div></div><div class="fbar"><div class="fbar-f" style="animation-duration:2.1s"></div></div><div style="margin-top:5px;color:var(--gr);font-size:.54rem">● 运行中</div></div>
+            <div class="fnode"><div class="fn-t">Particle System</div><div class="fbar"><div class="fbar-f" style="animation-duration:1.8s"></div></div><div style="margin-top:4px;font-size:.54rem">count: <span style="color:var(--ye)">10240</span></div></div>
+            <div class="fnode"><div class="fn-t">Post FX / Bloom</div><div class="fbar"><div class="fbar-f" style="animation-duration:3s"></div></div><div style="font-size:.54rem;margin-top:3px">threshold: <span style="color:var(--ye)">0.72</span></div></div>
+            <div class="fnode" style="border-color:rgba(0,229,255,.3);background:rgba(0,229,255,.04)"><div class="fn-t" style="color:var(--mg)">Output</div><div style="font-size:.54rem;color:var(--gr);line-height:1.8">1920×1080<br/>60 FPS ✓<br/>Spout →</div></div>
+          </div>
+        </div>
+        <div style="margin-top:.9rem;display:flex;gap:.65rem;flex-wrap:wrap">
+          <div style="padding:.35rem .75rem;background:rgba(0,255,157,.08);border:1px solid rgba(0,255,157,.2);border-radius:4px;font-size:.72rem;color:var(--gr);font-family:var(--fm)">Windows</div>
+          <div style="padding:.35rem .75rem;background:rgba(0,229,255,.08);border:1px solid var(--bs);border-radius:4px;font-size:.72rem;color:var(--td);font-family:var(--fm)">DirectX 11</div>
+          <div style="padding:.35rem .75rem;background:rgba(255,214,0,.08);border:1px solid rgba(255,214,0,.2);border-radius:4px;font-size:.72rem;color:var(--ye);font-family:var(--fm)">.NET 8+</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- 核心功能 -->
+  <section class="sec">
+    <div class="sec-label">核心功能</div>
+    <h2 class="sec-title">专业级特性，<span>开箱即用</span></h2>
+    <p class="sec-desc">TiXL 提供完整的实时图形创作工具链，从简单动效到复杂装置一站式搞定。</p>
+    <div class="fg">
+      <div class="fc" v-for="f in coreFeats" :key="f.tag">
+        <span class="fi">{{f.icon}}</span>
+        <div class="ftag">{{f.tag}}</div>
+        <h3>{{f.title}}</h3>
+        <p>{{f.desc}}</p>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- 社区 CTA -->
+  <section class="sec" style="text-align:center">
+    <div class="comm-box">
+      <div class="sec-label" style="justify-content:center">加入社区</div>
+      <h2 class="sec-title" style="margin-bottom:.65rem">与全球创作者一起<span>探索无限</span></h2>
+      <p style="color:var(--t2);max-width:480px;margin:0 auto;font-size:.95rem;line-height:1.8;position:relative;z-index:1">加入 Discord 社区，分享作品、获取帮助，与世界各地的 VJ 艺术家共同进化。</p>
+      <div class="comm-links">
+        <a class="clink" href="https://discord.gg/YmSyQdeH3S" target="_blank">💬 Discord 社区</a>
+        <a class="clink" href="https://github.com/tixl3d/tixl" target="_blank">⭐ GitHub 仓库</a>
+        <a class="clink" href="https://youtube.com/pixtur" target="_blank">▶️ YouTube 教程</a>
+        <a class="clink" href="https://instagram.com/tixl3d" target="_blank">📸 Instagram</a>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ══ 快速开始 ══ -->
+<div class="pg" :class="{on:page==='start'}">
+  <section class="sec" style="padding-top:7rem">
+    <div class="sec-label">快速开始</div>
+    <h2 class="sec-title">10 分钟开启你的<span>TiXL 之旅</span></h2>
+    <p class="sec-desc">按照以下步骤完成安装和基础配置，快速体验 TiXL 的强大功能。</p>
+    <div class="steps-wrap">
+      <div class="step-list">
+        <div class="step-it" :class="{on:activeStep===i}"
+             v-for="(s,i) in steps" :key="i" @click="activeStep=i">
+          <div class="step-n">{{pad(i+1)}}</div>
+          <div class="step-ct"><h4>{{s.title}}</h4><p>{{s.desc}}</p></div>
+        </div>
+      </div>
+      <div class="code-panel">
+        <div class="cp-head">▷ {{steps[activeStep].file}}</div>
+        <div class="cp-body">
+          <pre v-html="steps[activeStep].code"></pre>
+          <div class="note" v-if="steps[activeStep].note">💡 {{steps[activeStep].note}}</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <section class="sec">
+    <div class="sec-label">环境要求</div>
+    <h2 class="sec-title">系统<span>配置要求</span></h2>
+    <div class="req-grid">
+      <div class="req-box" style="border:1px solid rgba(0,255,157,.2)">
+        <div style="font-family:var(--fd);font-size:.72rem;letter-spacing:.1em;color:var(--gr);margin-bottom:.9rem">✓ 推荐配置</div>
+        <div class="req-row" v-for="r in sysGood" :key="r.l">
+          <span class="req-lbl">{{r.l}}</span><span>{{r.v}}</span>
+        </div>
+      </div>
+      <div class="req-box" style="border:1px solid var(--bs)">
+        <div style="font-family:var(--fd);font-size:.72rem;letter-spacing:.1em;color:var(--td);margin-bottom:.9rem">△ 最低配置</div>
+        <div class="req-row" v-for="r in sysMin" :key="r.l">
+          <span class="req-lbl">{{r.l}}</span><span style="color:var(--t2)">{{r.v}}</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <section class="sec">
+    <div class="sec-label">常见问题</div>
+    <h2 class="sec-title">安装疑问<span>快速解答</span></h2>
+    <div class="faq-list" style="margin-top:1rem">
+      <div class="faq-it" :class="{on:openFaq===i}"
+           v-for="(f,i) in faqs" :key="i" @click="openFaq=openFaq===i?-1:i">
+        <div class="faq-q"><h4>{{f.q}}</h4><div class="faq-chev">▼</div></div>
+        <div class="faq-a"><p v-html="f.a"></p></div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ══ 教程学习 ══ -->
+<div class="pg" :class="{on:page==='learn'}">
+  <section class="sec" style="padding-top:7rem">
+    <div class="sec-label">教程学习</div>
+    <h2 class="sec-title">从零到<span>进阶</span>，系统学习路径</h2>
+    <p class="sec-desc">精心整理的学习资源，无论你是初学者还是进阶用户，都能找到适合自己的内容。</p>
+    <div class="tabs">
+      <button class="tab" :class="{on:tTab==='all'}"          @click="tTab='all'">全部</button>
+      <button class="tab" :class="{on:tTab==='beginner'}"     @click="tTab='beginner'">入门基础</button>
+      <button class="tab" :class="{on:tTab==='intermediate'}" @click="tTab='intermediate'">进阶技巧</button>
+      <button class="tab" :class="{on:tTab==='advanced'}"     @click="tTab='advanced'">高级应用</button>
+    </div>
+    <div class="tgrid">
+      <div class="tc" v-for="t in filteredTuts" :key="t.title" @click="openTut(t)">
+        <div class="tthumb" :style="{background:t.bg}">
+          {{t.emoji}}
+          <div class="tplay"><svg width="13" height="13" viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21"/></svg></div>
+          <div class="tlev" :class="'lv-'+t.lv">{{lvLabel(t.lv)}}</div>
+        </div>
+        <div class="tbody">
+          <h3>{{t.title}}</h3>
+          <p>{{t.desc}}</p>
+          <div class="tmeta"><span>⏱ {{t.dur}}</span><span>{{t.type}}</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <section class="sec">
+    <div class="sec-label">学习路径</div>
+    <h2 class="sec-title">推荐<span>学习顺序</span></h2>
+    <div class="lpath">
+      <div class="lp-it" v-for="(p,i) in lpath" :key="i">
+        <div class="lp-num" :style="{background:p.color}">{{pad(i+1)}}</div>
+        <div class="lp-ct">
+          <h4>{{p.title}}</h4>
+          <p>{{p.desc}}</p>
+          <div class="tags"><span class="tag" v-for="tg in p.tags" :key="tg">{{tg}}</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ══ 资源中心 ══ -->
+<div class="pg" :class="{on:page==='res'}">
+  <section class="sec" style="padding-top:7rem">
+    <div class="sec-label">资源中心</div>
+    <h2 class="sec-title">所有你需要的<span>学习资源</span></h2>
+    <p class="sec-desc">汇总官方文档、示例项目、社区资源，助你快速提升创作能力。</p>
+    <div class="rgrid">
+      <a class="rc" v-for="r in resList" :key="r.title" :href="r.url" target="_blank">
+        <div class="ri" :style="{background:r.ibg}">{{r.icon}}</div>
+        <div>
+          <h3>{{r.title}}</h3>
+          <p>{{r.desc}}</p>
+          <div class="rlink">访问资源 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></div>
+        </div>
+      </a>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <section class="sec">
+    <div class="sec-label">快捷参考</div>
+    <h2 class="sec-title">常用<span>快捷键</span></h2>
+    <div class="sc-grid">
+      <div class="sc-box" v-for="g in shortcuts" :key="g.group">
+        <div class="sc-head">{{g.group}}</div>
+        <div class="sc-row" v-for="sc in g.items" :key="sc.desc">
+          <span class="sc-desc">{{sc.desc}}</span>
+          <div class="sc-keys"><kbd v-for="(k,ki) in sc.keys" :key="ki">{{k}}</kbd></div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ══ 社区 ══ -->
+<div class="pg" :class="{on:page==='comm'}">
+  <section class="sec" style="padding-top:7rem">
+    <div class="sec-label">社区</div>
+    <h2 class="sec-title">连接全球<span>创作者</span></h2>
+    <p class="sec-desc">TiXL 中文社区是连接国内外 VJ 艺术家、装置设计师和动态图形爱好者的桥梁。</p>
+    <div class="comm-box" style="margin-bottom:3rem">
+      <h3 style="font-family:var(--fd);font-size:1.4rem;margin-bottom:.65rem;position:relative;z-index:1;color:var(--t1)">加入我们，一起创作</h3>
+      <p style="color:var(--t2);position:relative;z-index:1;max-width:460px;margin:0 auto">无论你是刚接触 TiXL 的新手，还是有丰富经验的专业 VJ，都欢迎加入这个充满活力的创作社区。</p>
+      <div class="comm-links">
+        <a class="clink clink-col" href="https://discord.gg/YmSyQdeH3S" target="_blank">
+          <span class="ci">💬</span><span class="cn">Discord</span><span class="cs">主要讨论社区</span>
+        </a>
+        <a class="clink clink-col" href="https://github.com/tixl3d/tixl" target="_blank">
+          <span class="ci">⭐</span><span class="cn">GitHub</span><span class="cs">源码 &amp; Issues</span>
+        </a>
+        <a class="clink clink-col" href="https://youtube.com/pixtur" target="_blank">
+          <span class="ci">▶️</span><span class="cn">YouTube</span><span class="cs">官方视频教程</span>
+        </a>
+        <a class="clink clink-col" href="https://instagram.com/tixl3d" target="_blank">
+          <span class="ci">📸</span><span class="cn">Instagram</span><span class="cs">作品展示</span>
+        </a>
+      </div>
+    </div>
+    <div class="sec-label">社区准则</div>
+    <h2 class="sec-title">友好<span>交流环境</span></h2>
+    <div class="guide-grid">
+      <div class="guide-it" v-for="g in guidelines" :key="g.title">
+        <div class="gi">{{g.icon}}</div>
+        <h4>{{g.title}}</h4>
+        <p>{{g.desc}}</p>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- 页脚 -->
+<footer>
+  <div class="foot-grid">
+    <div class="foot-brand">
+      <div class="logo"><div class="logo-hex">TX</div><span class="logo-text">TiXL 中文社区</span></div>
+      <p>TiXL 中文爱好者社区，致力于推广开源实时动态图形软件，连接国内创作者与全球社区。</p>
+    </div>
+    <div class="foot-col">
+      <h5>导航</h5>
+      <ul>
+        <li><a @click="go('home')">首页</a></li>
+        <li><a @click="go('start')">快速开始</a></li>
+        <li><a @click="go('learn')">教程学习</a></li>
+        <li><a @click="go('res')">资源中心</a></li>
+      </ul>
+    </div>
+    <div class="foot-col">
+      <h5>官方链接</h5>
+      <ul>
+        <li><a href="https://tixl.app" target="_blank">官方网站</a></li>
+        <li><a href="https://github.com/tixl3d/tixl" target="_blank">GitHub 仓库</a></li>
+        <li><a href="https://github.com/tixl3d/tixl/releases" target="_blank">版本下载</a></li>
+        <li><a href="https://discord.gg/YmSyQdeH3S" target="_blank">Discord</a></li>
+      </ul>
+    </div>
+    <div class="foot-col">
+      <h5>社区</h5>
+      <ul>
+        <li><a href="https://youtube.com/pixtur" target="_blank">YouTube 教程</a></li>
+        <li><a href="https://instagram.com/tixl3d" target="_blank">Instagram</a></li>
+        <li><a @click="go('comm')">社区准则</a></li>
+        <li><a @click="go('comm')">加入我们</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="foot-btm">
+    <span>© 2025 TiXL 中文社区 · 非官方爱好者社区 · 开源协议见 <a href="https://github.com/tixl3d/tixl" target="_blank">GitHub</a></span>
+    <span>基于 <a href="https://vuejs.org" target="_blank">Vue 3</a> 构建</span>
+  </div>
+</footer>
+
+<div class="toast" v-if="toastMsg">{{toastMsg}}</div>
+</div>
+
+<script>
+const { createApp, ref, computed, onMounted, onUnmounted } = Vue;
+
+createApp({
+  setup() {
+    const page       = ref('home');
+    const isScrolled = ref(false);
+    const menuOpen   = ref(false);
+    const activeStep = ref(0);
+    const openFaq    = ref(-1);
+    const tTab       = ref('all');
+    const toastMsg   = ref('');
+    let toastTimer;
+
+    function showToast(m) {
+      toastMsg.value = m;
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(function() { toastMsg.value = ''; }, 2500);
+    }
+    function go(p) { page.value = p; menuOpen.value = false; window.scrollTo({ top: 0, behavior: 'smooth' }); }
+    function openTut(t) { t.url ? window.open(t.url, '_blank') : showToast('📺 即将开放，敬请期待！'); }
+    function lvLabel(lv) { return { beginner:'入门', intermediate:'进阶', advanced:'高级' }[lv] || lv; }
+    function pad(n) { return String(n).padStart(2, '0'); }
+
+    const onScroll = function() { isScrolled.value = window.scrollY > 20; };
+    onMounted(function() { window.addEventListener('scroll', onScroll); initCanvas(); });
+    onUnmounted(function() { window.removeEventListener('scroll', onScroll); });
+
+    // ── 数据 ──
+    const introFeats = [
+      { icon:'🎛️', t:'节点式工作流',   d:'通过可视化节点连接构建复杂效果，无需深入编程知识，直观高效。' },
+      { icon:'🎵', t:'音频响应',        d:'内置音频分析系统，让视觉效果随音乐律动，创造沉浸式现场体验。' },
+      { icon:'⚡', t:'实时高性能',      d:'基于 DirectX 11 的渲染引擎，支持自定义 HLSL Shader，帧率流畅稳定。' },
+      { icon:'🔌', t:'硬件与协议集成', d:'支持 MIDI 控制器、OSC 协议、Spout 输出，轻松接入专业演出设备。' },
+    ];
+
+    const coreFeats = [
+      { icon:'🕸️', tag:'Node System',    title:'可视化节点图',   desc:'用连接节点的方式构建复杂视觉效果，每个节点代表一种运算或效果，逻辑清晰直观。' },
+      { icon:'🎵', tag:'Audio Reactive', title:'音频反应系统',   desc:'内置 FFT 频谱分析，将低频鼓点、高频人声映射为视觉参数，轻松创造音画同步效果。' },
+      { icon:'✨', tag:'Particles',       title:'粒子系统',       desc:'支持数百万级粒子的 GPU 加速渲染，打造烟雾、火焰、星空等震撼视觉效果。' },
+      { icon:'🎨', tag:'Shader',          title:'HLSL 着色器',   desc:'直接在节点图中编写 HLSL Shader 代码，实现任何自定义后处理和渲染效果。' },
+      { icon:'⏱️', tag:'Timeline',        title:'时间线与关键帧', desc:'精细的时间线编辑器，支持关键帧动画和参数曲线，精确控制每一帧的视觉输出。' },
+      { icon:'🔌', tag:'Integration',     title:'硬件与协议',    desc:'支持 MIDI 控制器、OSC 协议、NDI/Spout 视频流输出，无缝接入专业演出工作流。' },
+    ];
+
+    var C = function(s) { return '<span class="' + s + '">'; }, CE = '</span>';
+    var cm = C('cm'), kw = C('kw'), st = C('str'), nu = C('num');
+
+    const steps = [
+      {
+        title:'检查系统要求', desc:'确认 Windows 已安装 .NET 8 运行时。', file:'check.ps1',
+        code: cm+'# 检查 .NET 版本'+CE+'\n'+kw+'dotnet'+CE+' '+st+'--version'+CE+'\n\n'+cm+'# 未安装请访问 dotnet.microsoft.com 下载'+CE+'\n\n'+cm+'# 检查 DirectX 版本（需要 DX11）'+CE+'\n'+kw+'dxdiag'+CE,
+        note:'TiXL 目前仅支持 Windows，需显卡支持 DirectX 11。'
+      },
+      {
+        title:'下载 TiXL', desc:'前往 GitHub Releases 下载最新版本。', file:'download.md',
+        code: cm+'# 方式1：直接下载预编译包（推荐）'+CE+'\n'+cm+'# https://github.com/tixl3d/tixl/releases'+CE+'\n\n'+cm+'# 方式2：克隆源码（开发者）'+CE+'\n'+kw+'git'+CE+' clone '+st+'https://github.com/tixl3d/tixl.git'+CE+'\n'+kw+'cd'+CE+' tixl\n'+kw+'dotnet'+CE+' build',
+        note:'推荐直接下载预编译版本，无需配置开发环境即可运行。'
+      },
+      {
+        title:'解压并启动', desc:'将压缩包解压到任意目录，双击 TiXL.exe 即可。', file:'launch.md',
+        code: cm+'# 解压到任意目录，例如 C:\\Tools\\TiXL\\'+CE+'\n\nTiXL/\n  '+st+'TiXL.exe'+CE+'      '+cm+'# 主程序'+CE+'\n  '+st+'Operators/'+CE+'    '+cm+'# 内置算子库'+CE+'\n  '+st+'Resources/'+CE+'    '+cm+'# 资源文件'+CE+'\n  '+st+'Examples/'+CE+'     '+cm+'# 示例项目'+CE+'\n\n'+cm+'# 双击 TiXL.exe 启动，首次运行自动初始化'+CE,
+        note:'安装路径不建议含中文或特殊字符，避免路径解析问题。'
+      },
+      {
+        title:'加载示例项目', desc:'打开自带示例，快速了解节点结构与工作流程。', file:'examples.md',
+        code: cm+'# File → Open → 选择 Examples 目录'+CE+'\n\nExamples/\n  '+st+'Hello World/'+CE+'    '+cm+'# 入门示例'+CE+'\n  '+st+'AudioReactive/'+CE+'  '+cm+'# 音频响应'+CE+'\n  '+st+'Particles/'+CE+'      '+cm+'# 粒子系统'+CE+'\n  '+st+'VJSet/'+CE+'          '+cm+'# 完整 VJ 套件'+CE+'\n\n'+cm+'# Space 暂停/播放，F11 全屏预览'+CE,
+        note:'建议先看官方15分钟入门视频，再动手操作示例项目。'
+      },
+      {
+        title:'创建第一个节点图', desc:'从空白项目开始，搭建第一个视觉效果节点图。', file:'first-project.md',
+        code: cm+'# Ctrl+Space 打开节点搜索面板'+CE+'\n\n'+cm+'# 典型节点连接关系：'+CE+'\n'+st+'Sphere'+CE+' → '+st+'Transform'+CE+' → '+st+'DrawMesh'+CE+' → '+st+'Output'+CE+'\n\n'+cm+'# 右键节点 → 为参数添加动画'+CE+'\n'+cm+'# 双击连线 → 查看中间数据'+CE,
+        note:'Ctrl+Space 可在任意位置打开节点搜索，Tab 键快速切换工具。'
+      },
+    ];
+
+    const sysGood = [
+      {l:'OS', v:'Windows 10/11 64位'},{l:'CPU', v:'Intel i7 / AMD Ryzen 7'},
+      {l:'RAM', v:'16 GB 或更多'},{l:'GPU', v:'NVIDIA RTX 2060 / AMD RX 6700 XT'},
+      {l:'Runtime', v:'.NET 8.0 Runtime'},{l:'DX', v:'DirectX 11'},
+    ];
+    const sysMin = [
+      {l:'OS', v:'Windows 10 64位'},{l:'CPU', v:'Intel i5 / AMD Ryzen 5'},
+      {l:'RAM', v:'8 GB'},{l:'GPU', v:'独显，支持 DirectX 11'},
+      {l:'Runtime', v:'.NET 8.0 Runtime'},{l:'DX', v:'DirectX 11'},
+    ];
+
+    const faqs = [
+      {q:'TiXL 是否完全免费？有商用限制吗？',        a:'TiXL 完全开源免费，遵循 MIT 许可证。可用于个人项目、商业演出、作品展览，无需支付任何费用。'},
+      {q:'TiXL 支持 macOS 或 Linux 吗？',            a:'目前仅支持 Windows，原因是渲染引擎基于 DirectX 11。如需在 Mac 上运行可尝试 Parallels 等虚拟化方案。'},
+      {q:'没有编程基础可以使用 TiXL 吗？',           a:'完全可以！TiXL 的核心是可视化节点编程，通过拖拉连接即可创建复杂效果。如需自定义 Shader 才需要了解 HLSL。'},
+      {q:'如何与 OBS、Resolume 等软件配合？',         a:'TiXL 支持通过 <a href="https://spout.zeal.co/" target="_blank">Spout</a> 协议将输出画面实时传送给 OBS、Resolume，添加 Spout Output 节点即可。'},
+      {q:'遇到问题去哪里求助？',                     a:'推荐加入官方 <a href="https://discord.gg/YmSyQdeH3S" target="_blank">Discord 社区</a>，作者和成员响应很快。也可在 <a href="https://github.com/tixl3d/tixl/issues" target="_blank">GitHub Issues</a> 提交 Bug 报告。'},
+      {q:'如何贡献自制的算子/节点？',                a:'Fork 项目后在 Operators 目录添加自定义节点，提交 Pull Request 即可。详见项目根目录的 CONTRIBUTING.md 文件。'},
+    ];
+
+    const tutorials = [
+      {title:'15分钟入门 TiXL',       desc:'跟随官方视频，从零了解基本界面、节点系统和第一个效果的创建。',         lv:'beginner',     dur:'15 min', type:'📹 视频', bg:'linear-gradient(135deg,#001a2e,#003355)', emoji:'🚀', url:'https://youtube.com/pixtur'},
+      {title:'节点图基础原理',         desc:'深入理解节点图工作原理，掌握数据流、类型系统和节点连接规则。',         lv:'beginner',     dur:'20 min', type:'📖 图文', bg:'linear-gradient(135deg,#1a0020,#330040)', emoji:'🕸️', url:null},
+      {title:'音频反应效果入门',       desc:'学习使用内置音频分析器，将频率映射到视觉参数，创作音画同步作品。',     lv:'beginner',     dur:'25 min', type:'📹 视频', bg:'linear-gradient(135deg,#001a10,#002a20)', emoji:'🎵', url:'https://youtube.com/pixtur'},
+      {title:'粒子系统深度解析',       desc:'掌握 GPU 粒子系统核心参数，打造烟雾、火焰、能量流等复杂效果。',       lv:'intermediate', dur:'40 min', type:'📖 图文', bg:'linear-gradient(135deg,#1a1000,#2a2000)', emoji:'✨', url:null},
+      {title:'HLSL Shader 自定义效果', desc:'在 TiXL 节点图中编写 HLSL 着色器代码，实现完全自定义渲染效果。',      lv:'intermediate', dur:'50 min', type:'📹 视频', bg:'linear-gradient(135deg,#001a1a,#003333)', emoji:'🎨', url:null},
+      {title:'MIDI 控制器接入',        desc:'配置 MIDI 控制器与 TiXL 参数绑定，实现现场实时调控视觉效果。',        lv:'intermediate', dur:'30 min', type:'📖 图文', bg:'linear-gradient(135deg,#1a0010,#330025)', emoji:'🎹', url:null},
+      {title:'Spout 输出到直播',       desc:'通过 Spout 协议将 TiXL 接入 OBS Studio，打造专业现场视觉直播流。',    lv:'intermediate', dur:'20 min', type:'📖 图文', bg:'linear-gradient(135deg,#0a0a1a,#151530)', emoji:'📡', url:null},
+      {title:'构建完整 VJ 演出系统',   desc:'综合运用时间线、MIDI、音频响应，构建一套可用于实际演出的 VJ 项目。',  lv:'advanced',     dur:'90 min', type:'📹 视频', bg:'linear-gradient(135deg,#1a0005,#33000f)', emoji:'🎭', url:'https://youtube.com/pixtur'},
+      {title:'自定义算子开发',         desc:'使用 C# 为 TiXL 开发自定义节点类型，扩展软件功能满足特殊需求。',      lv:'advanced',     dur:'60 min', type:'📖 图文', bg:'linear-gradient(135deg,#001510,#002518)', emoji:'⚙️', url:null},
+    ];
+
+    const filteredTuts = computed(function() {
+      if (tTab.value === 'all') return tutorials;
+      return tutorials.filter(function(t) { return t.lv === tTab.value; });
+    });
+
+    const lpath = [
+      {title:'了解界面与基本操作', desc:'熟悉主界面布局：节点图编辑器、参数面板、预览窗口和时间线。',           tags:['界面','导航','节点图','快捷键'],                color:'var(--cy)'},
+      {title:'掌握节点系统基础',   desc:'理解节点的概念，学会添加、连接、配置基础节点，创建第一个渲染流程。',   tags:['Render Target','DrawMesh','Transform','几何体'], color:'var(--gr)'},
+      {title:'添加动态与动画',     desc:'使用时间线创建关键帧动画，结合内置运算符添加自动化运动。',             tags:['Timeline','Keyframe','Operators','运动曲线'],    color:'var(--ye)'},
+      {title:'音频响应与实时交互', desc:'接入音频分析系统，让视觉效果与音乐同步，并使用 MIDI 进行实时操控。', tags:['AudioAnalysis','MIDI','OSC','FFT'],              color:'#ff8a00'},
+      {title:'进阶效果与 Shader', desc:'学习粒子系统、后处理效果，尝试编写 HLSL 实现自定义渲染效果。',          tags:['Particles','PostFX','HLSL','Bloom'],            color:'var(--mg)'},
+      {title:'输出与演出集成',     desc:'配置 Spout/NDI 输出，将画面接入 OBS、Resolume 完成完整演出系统。',      tags:['Spout','NDI','OBS','Resolume'],                 color:'#9b59b6'},
+    ];
+
+    const resList = [
+      {title:'GitHub 官方仓库',      desc:'查看源码、提交 Issue、下载最新版本、了解开发进度和贡献代码。', icon:'⭐', ibg:'rgba(255,214,0,.1)',   url:'https://github.com/tixl3d/tixl'},
+      {title:'GitHub Releases 下载', desc:'下载预编译好的 TiXL 安装包，支持各个历史版本，随时回滚。',     icon:'⬇️', ibg:'rgba(0,229,255,.1)',   url:'https://github.com/tixl3d/tixl/releases'},
+      {title:'YouTube 官方频道',     desc:'观看官方制作的教程视频、演示案例和功能介绍，持续更新中。',     icon:'▶️', ibg:'rgba(255,0,110,.1)',   url:'https://youtube.com/pixtur'},
+      {title:'Discord 社区',         desc:'加入实时讨论社区，获取帮助、分享作品、与核心开发者交流。',     icon:'💬', ibg:'rgba(88,101,242,.15)', url:'https://discord.gg/YmSyQdeH3S'},
+      {title:'官方网站',             desc:'访问 TiXL 官方网站，了解最新动态、活动信息和完整功能介绍。',   icon:'🌐', ibg:'rgba(0,255,157,.1)',   url:'https://tixl.app'},
+      {title:'Instagram 展示',       desc:'浏览全球创作者用 TiXL 制作的视觉作品，寻找创作灵感。',         icon:'📸', ibg:'rgba(255,105,180,.1)', url:'https://instagram.com/tixl3d'},
+      {title:'Spout 输出插件',       desc:'下载 Spout 框架，实现 TiXL 与 OBS、Resolume 的实时画面传输。', icon:'📡', ibg:'rgba(255,165,0,.1)',   url:'https://spout.zeal.co/'},
+      {title:'.NET 8 运行时',        desc:'下载 TiXL 所需的 .NET 8 运行时环境，确保软件正常运行。',       icon:'⚙️', ibg:'rgba(100,149,237,.1)', url:'https://dotnet.microsoft.com/download/dotnet/8.0'},
+    ];
+
+    const shortcuts = [
+      {group:'通用操作', items:[{desc:'保存项目',keys:['Ctrl','S']},{desc:'撤销',keys:['Ctrl','Z']},{desc:'重做',keys:['Ctrl','Y']},{desc:'播放/暂停',keys:['Space']},{desc:'全屏预览',keys:['F11']}]},
+      {group:'节点图',   items:[{desc:'节点搜索',keys:['Ctrl','Space']},{desc:'删除节点',keys:['Del']},{desc:'复制节点',keys:['Ctrl','D']},{desc:'聚焦选中',keys:['F']},{desc:'全选',keys:['Ctrl','A']}]},
+      {group:'时间线',   items:[{desc:'添加关键帧',keys:['K']},{desc:'上一帧',keys:['Alt','←']},{desc:'下一帧',keys:['Alt','→']},{desc:'跳到开头',keys:['Home']},{desc:'跳到末尾',keys:['End']}]},
+      {group:'视图',     items:[{desc:'切换面板',keys:['Tab']},{desc:'节点图视图',keys:['Ctrl','1']},{desc:'时间线视图',keys:['Ctrl','2']},{desc:'参数面板',keys:['Ctrl','3']},{desc:'全局输出',keys:['~']}]},
+    ];
+
+    const guidelines = [
+      {icon:'🤝', title:'友善互助',  desc:'无论新手还是老手，保持友善和耐心。分享你的经验，帮助社区共同成长。'},
+      {icon:'🎨', title:'分享创作',  desc:'积极分享你用 TiXL 制作的作品，激发更多人的创作灵感和学习兴趣。'},
+      {icon:'🐛', title:'反馈问题',  desc:'遇到 Bug 或问题，欢迎在 GitHub Issues 或 Discord 详细描述，帮助改进软件。'},
+      {icon:'🌏', title:'包容多元',  desc:'欢迎不同背景的创作者：VJ、装置艺术家、程序员、音乐人，多元视角造就更好社区。'},
+      {icon:'📚', title:'知识共享',  desc:'鼓励编写教程、翻译文档、整理资源，让中文用户更容易接触和学习 TiXL。'},
+      {icon:'🔧', title:'开源精神',  desc:'TiXL 是开源项目，欢迎贡献代码、算子库、示例项目，共同推动软件发展。'},
+    ];
+
+    return {
+      page, isScrolled, menuOpen, activeStep, openFaq, tTab, toastMsg,
+      go, openTut, lvLabel, pad,
+      introFeats, coreFeats, steps, sysGood, sysMin, faqs,
+      filteredTuts, lpath, resList, shortcuts, guidelines,
+    };
+  }
+}).mount('#app');
+
+// 粒子背景
+function initCanvas() {
+  var cvs = document.getElementById('cvs');
+  if (!cvs) return;
+  var ctx = cvs.getContext('2d');
+  var W = 0, H = 0, pts = [];
+
+  function resize() { W = cvs.width = innerWidth; H = cvs.height = innerHeight; }
+
+  function Pt() {
+    this.x  = Math.random() * W;
+    this.y  = Math.random() * H;
+    this.vx = (Math.random() - .5) * .35;
+    this.vy = (Math.random() - .5) * .35;
+    this.r  = Math.random() * 1.3 + .3;
+    this.op = Math.random() * .4 + .1;
+    this.hue = Math.random() < .6 ? 195 : 340;
+  }
+  Pt.prototype.update = function() {
+    this.x += this.vx; this.y += this.vy;
+    if (this.x < 0 || this.x > W || this.y < 0 || this.y > H) {
+      this.x = Math.random() * W; this.y = Math.random() * H;
+    }
+  };
+  Pt.prototype.draw = function() {
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
+    ctx.fillStyle = 'hsla(' + this.hue + ',100%,70%,' + this.op + ')';
+    ctx.fill();
+  };
+
+  function mkPts() {
+    pts = [];
+    for (var i = 0; i < 90; i++) pts.push(new Pt());
+  }
+
+  function loop() {
+    ctx.clearRect(0, 0, W, H);
+    var i, j, dx, dy, d;
+    for (i = 0; i < pts.length; i++) {
+      pts[i].update(); pts[i].draw();
+    }
+    for (i = 0; i < pts.length; i++) {
+      for (j = i + 1; j < pts.length; j++) {
+        dx = pts[i].x - pts[j].x; dy = pts[i].y - pts[j].y;
+        d = Math.sqrt(dx * dx + dy * dy);
+        if (d < 100) {
+          ctx.beginPath();
+          ctx.moveTo(pts[i].x, pts[i].y);
+          ctx.lineTo(pts[j].x, pts[j].y);
+          ctx.strokeStyle = 'rgba(0,229,255,' + ((1 - d / 100) * .07) + ')';
+          ctx.lineWidth = .5;
+          ctx.stroke();
+        }
+      }
+    }
+    requestAnimationFrame(loop);
+  }
+
+  window.addEventListener('resize', function() { resize(); mkPts(); });
+  resize(); mkPts(); loop();
+}
+</script>
+</body>
+</html>
